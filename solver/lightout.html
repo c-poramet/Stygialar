@@ -181,7 +181,7 @@
 <body>
     <div class="main" id="main">
         <!-- <h1>Light Out Solver</h1> -->
-        <div id="grid-display" style="display: flex; justify-content: center; align-items: center;"></div>
+        <div id="grid-display" style="display: flex; justify-content: center; align-items: center; height: 100%;"></div>
     </div>
     <div class="side">
         <div class="terminal">
@@ -939,13 +939,26 @@
         function renderGrid() {
             gridDisplay.innerHTML = '';
             
+            // Calculate optimal cell size to fit the screen
+            const displayHeight = gridDisplay.clientHeight || window.innerHeight * 0.8;
+            const displayWidth = gridDisplay.clientWidth || window.innerWidth * 0.6;
+            
+            const maxCellHeight = Math.floor((displayHeight - 100) / puzzleState.gridHeight);
+            const maxCellWidth = Math.floor((displayWidth - 100) / puzzleState.gridWidth);
+            const cellSize = Math.max(20, Math.min(80, Math.min(maxCellHeight, maxCellWidth)));
+            const gap = Math.max(2, Math.floor(cellSize / 12));
+            
             const container = document.createElement('div');
             container.className = 'grid-container';
-            container.style.gridTemplateColumns = `repeat(${puzzleState.gridWidth}, 50px)`;
+            container.style.gridTemplateColumns = `repeat(${puzzleState.gridWidth}, ${cellSize}px)`;
+            container.style.gap = `${gap}px`;
 
             for (let i = 0; i < puzzleState.gridWidth * puzzleState.gridHeight; i++) {
                 const cell = document.createElement('div');
                 cell.className = 'grid-cell';
+                cell.style.width = `${cellSize}px`;
+                cell.style.height = `${cellSize}px`;
+                cell.style.fontSize = `${Math.max(12, cellSize / 3)}px`;
                 
                 if (puzzleState.manualSetMode) {
                     cell.classList.add('clickable');
