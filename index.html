@@ -58,6 +58,7 @@
             'input': 'Add equation (e.g., input 3x + y = 8)',
             'showinputs': 'Display all equations',
             'deleteinputs': 'Delete equations by index',
+            'clearinputs': 'Clear all equations',
             'solve': 'Solve the system of equations',
             'flag': 'Set solver flags (complex, integer, positive)',
             'showflags': 'Show current flags'
@@ -351,6 +352,7 @@
                     addLine('  input <equation>      - Add equation (e.g., input 3x + y = 8)');
                     addLine('  showinputs            - Display all equations');
                     addLine('  deleteinputs <idx...> - Delete equations by index');
+                    addLine('  clearinputs           - Clear all equations');
                     addLine('  solve                 - Solve the system of equations');
                     addLine('  flag <name> <on|off>  - Set solver flags');
                     addLine('  showflags             - Show current flags');
@@ -422,6 +424,12 @@
                         addLine(`<span class="error">Error: ${escapeHtml(error.message)}</span>`);
                         addLine('&nbsp;');
                     }
+                    break;
+
+                case 'clearinputs':
+                    EqSolver.reset();
+                    addLine('<span class="dim">All equations cleared</span>');
+                    addLine('&nbsp;');
                     break;
 
                 case 'solve':
