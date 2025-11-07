@@ -7,6 +7,7 @@
     
     <link rel="stylesheet" href="styles.css">
     <script src="scripts/eqsolver.js"></script>
+    <script src="scripts/lightout.js"></script>
 </head>
 <body>
     <div class="terminal-container" id="terminal">
@@ -33,7 +34,7 @@
         const suggestionsContainer = document.getElementById('suggestions');
 
         // Application state
-        let currentApp = null; // null = root, 'eqsolver' = equation solver
+        let currentApp = null; // null = root, 'eqsolver' = equation solver, 'lightout' = light out solver
 
         // Command history
         const history = [];
@@ -49,6 +50,7 @@
             'clear': 'Clear terminal screen',
             'ls': 'List available programs',
             'eqsolver': 'Launch equation solver',
+            'lightout': 'Launch Light Out puzzle solver',
             'about': 'About this system'
         };
 
@@ -62,6 +64,17 @@
             'solve': 'Solve with flags: --pi, --fraction, --integer, --positive'
         };
 
+        const lightoutCommands = {
+            'help': 'Show Light Out solver commands',
+            'exit': 'Exit Light Out solver',
+            'init': 'Initialize puzzle: init --size M N --states T',
+            'setstate': 'Set grid state row by row',
+            'show': 'Display current puzzle state',
+            'solve': 'Solve the puzzle (use --visual for step-by-step)',
+            'reset': 'Reset puzzle to all zeros',
+            'click': 'Manually click a cell: click ROW COL'
+        };
+
         const solveFlags = {
             '--pi': 'Display solutions as multiples of π',
             '--fraction': 'Display solutions as fractions',
@@ -70,12 +83,28 @@
             '--complex': 'Enable complex solutions (future)'
         };
 
+        const lightoutSolveFlags = {
+            '--visual': 'Show step-by-step solution animation',
+            '--minimal': 'Show minimal solution only',
+            '--grid': 'Display solution as grid'
+        };
+
         const helpTopics = {
             'input': 'Help for input command',
             'solve': 'Help for solve command and flags',
             'showinputs': 'Help for showinputs command',
             'deleteinputs': 'Help for deleteinputs command',
             'clearinputs': 'Help for clearinputs command',
+            'exit': 'Help for exit command'
+        };
+
+        const lightoutHelpTopics = {
+            'init': 'Help for init command',
+            'setstate': 'Help for setstate command',
+            'show': 'Help for show command',
+            'solve': 'Help for solve command and flags',
+            'reset': 'Help for reset command',
+            'click': 'Help for click command',
             'exit': 'Help for exit command'
         };
 
@@ -103,7 +132,13 @@
                 return;
             }
 
-            const commands = currentApp === 'eqsolver' ? eqsolverCommands : rootCommands;
+            let commands = rootCommands;
+            if (currentApp === 'eqsolver') {
+                commands = eqsolverCommands;
+            } else if (currentApp === 'lightout') {
+                commands = lightoutCommands;
+            }
+            
             const words = input.split(' ');
             const firstWord = words[0];
 
@@ -139,6 +174,37 @@
                     if (words.length === 1 || lastWord.startsWith('--') || words[words.length - 2] !== words[words.length - 1]) {
                         for (const [flag, desc] of Object.entries(solveFlags)) {
                             // Don't suggest flags already used
+                            if (!input.includes(flag) && flag.startsWith(lastWord)) {
+                                const currentFlags = words.slice(1).filter(w => w.startsWith('--'));
+                                const newCmd = `solve ${currentFlags.join(' ')} ${flag}`.trim();
+                                suggestions.push({
+                                    command: newCmd,
+                                    description: desc
+                                });
+                            }
+                        }
+                    }
+                }
+            } else if (currentApp === 'lightout') {
+                // Help command suggestions
+                if (firstWord === 'help' && words.length === 2) {
+                    const topicStart = words[1];
+                    for (const [topic, desc] of Object.entries(lightoutHelpTopics)) {
+                        if (topic.startsWith(topicStart)) {
+                            suggestions.push({
+                                command: `help ${topic}`,
+                                description: desc
+                            });
+                        }
+                    }
+                }
+                
+                // Solve command flag suggestions
+                if (firstWord === 'solve') {
+                    const lastWord = words[words.length - 1];
+                    
+                    if (words.length === 1 || lastWord.startsWith('--') || words[words.length - 2] !== words[words.length - 1]) {
+                        for (const [flag, desc] of Object.entries(lightoutSolveFlags)) {
                             if (!input.includes(flag) && flag.startsWith(lastWord)) {
                                 const currentFlags = words.slice(1).filter(w => w.startsWith('--'));
                                 const newCmd = `solve ${currentFlags.join(' ')} ${flag}`.trim();
@@ -229,6 +295,13 @@
             terminal.scrollTop = terminal.scrollHeight;
         }
 
+        // Wait for user input (for multi-line commands)
+        let inputCallback = null;
+
+        function waitForInput(callback) {
+            inputCallback = callback;
+        }
+
         // Handle keyboard input
         commandInput.addEventListener('keydown', (e) => {
             if (e.key === 'Tab') {
@@ -246,6 +319,23 @@
                 const command = commandInput.value.trim();
                 
                 if (command) {
+                    // Check if waiting for input
+                    if (inputCallback) {
+                        const callback = inputCallback;
+                        inputCallback = null;
+                        
+                        // Display input
+                        const promptText = `<span class="prompt">${promptUser.textContent}</span> <span class="accent">${promptPath.textContent}</span>`;
+                        addLine(promptText + ' ' + escapeHtml(command));
+                        
+                        // Execute callback
+                        callback(command);
+                        
+                        // Clear input
+                        commandInput.value = '';
+                        return;
+                    }
+                    
                     // Add to history
                     history.push(command);
                     historyIndex = -1;
@@ -259,6 +349,8 @@
                         executeRootCommand(command);
                     } else if (currentApp === 'eqsolver') {
                         executeEqSolverCommand(command);
+                    } else if (currentApp === 'lightout') {
+                        executeLightOutCommand(command);
                     }
                     
                     // Clear input
@@ -297,6 +389,9 @@
             } else if (currentApp === 'eqsolver') {
                 promptUser.textContent = 'eqsolver';
                 promptPath.textContent = '>';
+            } else if (currentApp === 'lightout') {
+                promptUser.textContent = 'lightout';
+                promptPath.textContent = '>';
             }
         }
 
@@ -319,6 +414,7 @@
                     addLine('  clear    - Clear terminal screen');
                     addLine('  ls       - List available programs');
                     addLine('  eqsolver - Launch equation solver');
+                    addLine('  lightout - Launch Light Out puzzle solver');
                     addLine('  about    - About this system');
                     addLine('&nbsp;');
                     break;
@@ -330,6 +426,7 @@
                 case 'ls':
                     addLine('&nbsp;');
                     addLine('eqsolver');
+                    addLine('lightout');
                     addLine('solver/');
                     addLine('&nbsp;');
                     break;
@@ -344,6 +441,20 @@
                     addLine('<span class="accent">╚═══════════════════════════════════════╝</span>');
                     addLine('&nbsp;');
                     addLine('<span class="dim">Type "help" for available commands</span>');
+                    addLine('&nbsp;');
+                    break;
+
+                case 'lightout':
+                    currentApp = 'lightout';
+                    updatePrompt();
+                    LightOut.initialize(5, 5, 2); // Default 5x5 binary
+                    addLine('&nbsp;');
+                    addLine('<span class="accent">╔═══════════════════════════════════════╗</span>');
+                    addLine('<span class="accent">║     LIGHT OUT SOLVER v1.0             ║</span>');
+                    addLine('<span class="accent">╚═══════════════════════════════════════╝</span>');
+                    addLine('&nbsp;');
+                    addLine('<span class="dim">Type "help" for available commands</span>');
+                    addLine('<span class="dim">Initialize with: init --size M N --states T</span>');
                     addLine('&nbsp;');
                     break;
                     
@@ -635,6 +746,340 @@
                         }
                         
                         addLine('&nbsp;');
+                    } catch (error) {
+                        addLine(`<span class="error">Error: ${escapeHtml(error.message)}</span>`);
+                        addLine('&nbsp;');
+                    }
+                    break;
+
+                default:
+                    addLine(`<span class="error">Unknown command: ${command}</span>`);
+                    addLine('<span class="dim">Type "help" for available commands</span>');
+                    addLine('&nbsp;');
+            }
+        }
+
+        // Execute Light Out commands
+        function executeLightOutCommand(cmd) {
+            const parts = cmd.split(' ');
+            const command = parts[0].toLowerCase();
+
+            switch(command) {
+                case 'help':
+                    const helpTopic = parts[1]?.toLowerCase();
+                    addLine('&nbsp;');
+                    
+                    if (!helpTopic) {
+                        // General help
+                        addLine('<span class="accent">Light Out Solver Commands:</span>');
+                        addLine('  help [command]    - Show help (use help <command> for details)');
+                        addLine('  exit              - Exit Light Out solver');
+                        addLine('  init              - Initialize puzzle grid');
+                        addLine('  setstate          - Set grid state row by row');
+                        addLine('  show              - Display current puzzle state');
+                        addLine('  solve [flags]     - Solve the puzzle');
+                        addLine('  reset             - Reset puzzle to all zeros');
+                        addLine('  click ROW COL     - Manually click a cell');
+                        addLine('&nbsp;');
+                        addLine('<span class="dim">Available solve flags: --visual, --minimal, --grid</span>');
+                        addLine('<span class="dim">Type "help <command>" for details</span>');
+                        addLine('<span class="dim">Start typing "help " to see available help topics</span>');
+                    } else {
+                        switch(helpTopic) {
+                            case 'init':
+                                addLine('<span class="accent">init - Initialize puzzle grid</span>');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Usage:</span>');
+                                addLine('  init --size M N --states T');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Parameters:</span>');
+                                addLine('  --size M N    Grid dimensions (M rows, N columns)');
+                                addLine('  --states T    Number of states per cell (default: 2)');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Examples:</span>');
+                                addLine('  init --size 5 5 --states 2    (Classic 5x5 binary)');
+                                addLine('  init --size 3 4 --states 3    (3x4 grid with 3 states)');
+                                addLine('  init --size 7 7 --states 2    (7x7 binary grid)');
+                                break;
+                                
+                            case 'setstate':
+                                addLine('<span class="accent">setstate - Set grid state row by row</span>');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Usage:</span>');
+                                addLine('  setstate');
+                                addLine('  [Enter values row by row when prompted]');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Example for 3x3 grid:</span>');
+                                addLine('  setstate');
+                                addLine('  Row 1: 1 0 1');
+                                addLine('  Row 2: 0 1 0');
+                                addLine('  Row 3: 1 0 1');
+                                break;
+                                
+                            case 'solve':
+                                addLine('<span class="accent">solve - Solve the Light Out puzzle</span>');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Usage:</span>');
+                                addLine('  solve [--flag1] [--flag2] ...');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Available Flags:</span>');
+                                for (const [flag, desc] of Object.entries(lightoutSolveFlags)) {
+                                    addLine(`  <span class="accent">${flag.padEnd(12)}</span> ${desc}`);
+                                }
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Examples:</span>');
+                                addLine('  solve                 (Basic solution)');
+                                addLine('  solve --visual        (Step-by-step animation)');
+                                addLine('  solve --grid          (Solution as grid)');
+                                break;
+                                
+                            case 'show':
+                                addLine('<span class="accent">show - Display current puzzle state</span>');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Usage:</span>');
+                                addLine('  show');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Shows grid dimensions, states, and current configuration</span>');
+                                break;
+                                
+                            case 'reset':
+                                addLine('<span class="accent">reset - Reset puzzle to all zeros</span>');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Usage:</span>');
+                                addLine('  reset');
+                                break;
+                                
+                            case 'click':
+                                addLine('<span class="accent">click - Manually click a cell</span>');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Usage:</span>');
+                                addLine('  click ROW COL');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Example:</span>');
+                                addLine('  click 2 3    (Click cell at row 2, column 3)');
+                                break;
+                                
+                            case 'exit':
+                                addLine('<span class="accent">exit - Exit Light Out solver</span>');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Usage:</span>');
+                                addLine('  exit');
+                                break;
+                                
+                            default:
+                                addLine(`<span class="error">No help available for: ${helpTopic}</span>`);
+                        }
+                    }
+                    addLine('&nbsp;');
+                    break;
+
+                case 'exit':
+                    currentApp = null;
+                    updatePrompt();
+                    addLine('<span class="dim">Exiting Light Out solver...</span>');
+                    addLine('&nbsp;');
+                    break;
+
+                case 'init':
+                    try {
+                        let width = 5, height = 5, states = 2;
+                        
+                        // Parse flags
+                        for (let i = 1; i < parts.length; i++) {
+                            if (parts[i] === '--size' && i + 2 < parts.length) {
+                                height = parseInt(parts[i + 1]);
+                                width = parseInt(parts[i + 2]);
+                                i += 2;
+                            } else if (parts[i] === '--states' && i + 1 < parts.length) {
+                                states = parseInt(parts[i + 1]);
+                                i += 1;
+                            }
+                        }
+                        
+                        if (isNaN(width) || isNaN(height) || isNaN(states) || width < 1 || height < 1 || states < 2) {
+                            throw new Error('Invalid parameters');
+                        }
+                        
+                        LightOut.initialize(width, height, states);
+                        addLine(`<span class="dim">Initialized ${height}x${width} grid with ${states} states per cell</span>`);
+                        addLine('&nbsp;');
+                    } catch (error) {
+                        addLine(`<span class="error">Error: ${escapeHtml(error.message)}</span>`);
+                        addLine('<span class="dim">Usage: init --size M N --states T</span>');
+                        addLine('&nbsp;');
+                    }
+                    break;
+
+                case 'setstate':
+                    addLine('<span class="dim">Enter grid state row by row (space-separated values)</span>');
+                    addLine('&nbsp;');
+                    
+                    let currentRow = 0;
+                    const allStates = [];
+                    
+                    const processRow = (rowInput) => {
+                        const values = rowInput.trim().split(/\s+/).map(v => parseInt(v));
+                        
+                        if (values.length !== LightOut.gridWidth) {
+                            addLine(`<span class="error">Expected ${LightOut.gridWidth} values, got ${values.length}</span>`);
+                            addLine(`<span class="dim">Row ${currentRow + 1}:</span>`);
+                            waitForInput(processRow);
+                            return;
+                        }
+                        
+                        allStates.push(...values);
+                        currentRow++;
+                        
+                        if (currentRow < LightOut.gridHeight) {
+                            addLine(`<span class="dim">Row ${currentRow + 1}:</span>`);
+                            waitForInput(processRow);
+                        } else {
+                            try {
+                                LightOut.setState(allStates);
+                                addLine('<span class="dim">Grid state updated successfully!</span>');
+                                addLine('&nbsp;');
+                            } catch (error) {
+                                addLine(`<span class="error">Error: ${escapeHtml(error.message)}</span>`);
+                                addLine('&nbsp;');
+                            }
+                        }
+                    };
+                    
+                    addLine(`<span class="dim">Row 1:</span>`);
+                    waitForInput(processRow);
+                    break;
+
+                case 'show':
+                    addLine('&nbsp;');
+                    addLine('<span class="accent">Current Puzzle Configuration:</span>');
+                    addLine(`<span class="dim">Grid Size: ${LightOut.gridHeight}x${LightOut.gridWidth}</span>`);
+                    addLine(`<span class="dim">States per cell: ${LightOut.maxStates}</span>`);
+                    addLine('&nbsp;');
+                    addLine('<span class="accent">Current State:</span>');
+                    
+                    const grid = LightOut.getStateAsGrid();
+                    for (let i = 0; i < grid.length; i++) {
+                        const rowStr = grid[i].map(v => v.toString().padStart(2)).join(' ');
+                        addLine(`<span class="dim">  ${rowStr}</span>`);
+                    }
+                    addLine('&nbsp;');
+                    break;
+
+                case 'reset':
+                    LightOut.reset();
+                    addLine('<span class="dim">Puzzle reset to all zeros</span>');
+                    addLine('&nbsp;');
+                    break;
+
+                case 'click':
+                    try {
+                        if (parts.length < 3) {
+                            throw new Error('Usage: click ROW COL');
+                        }
+                        
+                        const row = parseInt(parts[1]) - 1;
+                        const col = parseInt(parts[2]) - 1;
+                        
+                        if (isNaN(row) || isNaN(col) || row < 0 || row >= LightOut.gridHeight || col < 0 || col >= LightOut.gridWidth) {
+                            throw new Error(`Invalid position. Grid is ${LightOut.gridHeight}x${LightOut.gridWidth}`);
+                        }
+                        
+                        LightOut.toggleCell(row, col);
+                        addLine(`<span class="dim">Clicked cell (${row + 1}, ${col + 1})</span>`);
+                        addLine('&nbsp;');
+                    } catch (error) {
+                        addLine(`<span class="error">Error: ${escapeHtml(error.message)}</span>`);
+                        addLine('&nbsp;');
+                    }
+                    break;
+
+                case 'solve':
+                    try {
+                        // Parse flags
+                        const visual = cmd.toLowerCase().includes('--visual');
+                        const minimal = cmd.toLowerCase().includes('--minimal');
+                        const grid = cmd.toLowerCase().includes('--grid');
+                        
+                        addLine('<span class="dim">Solving puzzle using Gaussian elimination...</span>');
+                        addLine('&nbsp;');
+                        
+                        const result = LightOut.solve();
+                        
+                        if (!result.solvable) {
+                            addLine('<span class="warning">╔═══════════════════════════════════════╗</span>');
+                            addLine('<span class="warning">║  NO SOLUTION EXISTS                   ║</span>');
+                            addLine('<span class="warning">╚═══════════════════════════════════════╝</span>');
+                            addLine(`<span class="error">${result.message}</span>`);
+                            addLine('&nbsp;');
+                        } else if (result.clicks === 0) {
+                            addLine('<span class="accent">╔═══════════════════════════════════════╗</span>');
+                            addLine('<span class="accent">║  PUZZLE ALREADY SOLVED!               ║</span>');
+                            addLine('<span class="accent">╚═══════════════════════════════════════╝</span>');
+                            addLine('&nbsp;');
+                        } else {
+                            addLine('<span class="accent">╔═══════════════════════════════════════╗</span>');
+                            addLine('<span class="accent">║  SOLUTION FOUND!                      ║</span>');
+                            addLine('<span class="accent">╚═══════════════════════════════════════╝</span>');
+                            addLine('&nbsp;');
+                            addLine(`<span class="dim">Total clicks: ${result.clicks}</span>`);
+                            addLine(`<span class="dim">Unique cells: ${result.uniqueClicks}</span>`);
+                            addLine('&nbsp;');
+                            
+                            if (grid || !minimal) {
+                                addLine('<span class="accent">Solution Grid:</span>');
+                                for (let i = 0; i < LightOut.gridHeight; i++) {
+                                    const rowStr = result.solutionGrid
+                                        .slice(i * LightOut.gridWidth, (i + 1) * LightOut.gridWidth)
+                                        .map(v => v.toString().padStart(2))
+                                        .join(' ');
+                                    addLine(`<span class="dim">  ${rowStr}</span>`);
+                                }
+                                addLine('&nbsp;');
+                            }
+                            
+                            if (!minimal) {
+                                addLine('<span class="accent">Cells to click:</span>');
+                                const clickMap = {};
+                                for (const idx of result.solution) {
+                                    clickMap[idx] = (clickMap[idx] || 0) + 1;
+                                }
+                                
+                                for (const [idx, times] of Object.entries(clickMap)) {
+                                    const i = parseInt(idx);
+                                    const row = Math.floor(i / LightOut.gridWidth) + 1;
+                                    const col = (i % LightOut.gridWidth) + 1;
+                                    const timesStr = times > 1 ? ` (${times} times)` : '';
+                                    addLine(`<span class="dim">  (${row}, ${col})${timesStr}</span>`);
+                                }
+                                addLine('&nbsp;');
+                            }
+                            
+                            if (visual) {
+                                addLine('<span class="accent">Step-by-Step Simulation:</span>');
+                                addLine('&nbsp;');
+                                
+                                const steps = LightOut.simulateSolution(result.solution);
+                                for (const step of steps) {
+                                    if (step.step === 0) {
+                                        addLine(`<span class="dim">Step ${step.step}: ${step.action}</span>`);
+                                    } else {
+                                        addLine(`<span class="accent">Step ${step.step}: ${step.action}</span>`);
+                                    }
+                                    
+                                    const stepGrid = LightOut.getStateAsGrid.call({ 
+                                        gridHeight: LightOut.gridHeight, 
+                                        gridWidth: LightOut.gridWidth,
+                                        cellStates: step.state 
+                                    });
+                                    
+                                    for (const row of stepGrid) {
+                                        const rowStr = row.map(v => v.toString().padStart(2)).join(' ');
+                                        addLine(`<span class="dim">  ${rowStr}</span>`);
+                                    }
+                                    addLine('&nbsp;');
+                                }
+                            }
+                        }
                     } catch (error) {
                         addLine(`<span class="error">Error: ${escapeHtml(error.message)}</span>`);
                         addLine('&nbsp;');
