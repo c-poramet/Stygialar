@@ -18,6 +18,7 @@
     </div>
 
     <div class="input-line">
+        <div class="suggestions-container" id="suggestions" style="display: none;"></div>
         <span class="prompt" id="promptUser">root@stygialar</span>&nbsp;<span class="accent" id="promptPath">~$</span>&nbsp;
         <input type="text" class="input-field" id="commandInput" autocomplete="off" autofocus>
         <span class="cursor"></span>
@@ -29,6 +30,7 @@
         const terminal = document.getElementById('terminal');
         const promptUser = document.getElementById('promptUser');
         const promptPath = document.getElementById('promptPath');
+        const suggestionsContainer = document.getElementById('suggestions');
 
         // Application state
         let currentApp = null; // null = root, 'eqsolver' = equation solver
@@ -37,13 +39,159 @@
         const history = [];
         let historyIndex = -1;
 
+        // Autocomplete state
+        let suggestions = [];
+        let selectedSuggestionIndex = -1;
+
+        // Command definitions
+        const rootCommands = {
+            'help': 'Show available commands',
+            'clear': 'Clear terminal screen',
+            'ls': 'List available programs',
+            'eqsolver': 'Launch equation solver',
+            'about': 'About this system'
+        };
+
+        const eqsolverCommands = {
+            'help': 'Show equation solver commands',
+            'exit': 'Exit equation solver',
+            'input': 'Add equation (e.g., input 3x + y = 8)',
+            'showinputs': 'Display all equations',
+            'deleteinputs': 'Delete equations by index',
+            'solve': 'Solve the system of equations',
+            'flag': 'Set solver flags (complex, integer, positive)',
+            'showflags': 'Show current flags'
+        };
+
         // Focus input on load
         commandInput.focus();
 
         // Keep focus on input
-        document.addEventListener('click', () => {
-            commandInput.focus();
+        document.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('suggestion-item')) {
+                commandInput.focus();
+            }
         });
+
+        // Handle input changes for autocomplete
+        commandInput.addEventListener('input', (e) => {
+            updateSuggestions();
+        });
+
+        // Update suggestions based on current input
+        function updateSuggestions() {
+            const input = commandInput.value.trim().toLowerCase();
+            
+            if (!input) {
+                hideSuggestions();
+                return;
+            }
+
+            const commands = currentApp === 'eqsolver' ? eqsolverCommands : rootCommands;
+            const words = input.split(' ');
+            const firstWord = words[0];
+
+            suggestions = [];
+
+            // Match commands that start with the first word
+            for (const [cmd, desc] of Object.entries(commands)) {
+                if (cmd.startsWith(firstWord)) {
+                    suggestions.push({ command: cmd, description: desc });
+                }
+            }
+
+            // Add flag suggestions for eqsolver
+            if (currentApp === 'eqsolver') {
+                if (firstWord === 'flag' && words.length === 2) {
+                    const flagStart = words[1];
+                    ['complex', 'integer', 'positive'].forEach(flag => {
+                        if (flag.startsWith(flagStart)) {
+                            suggestions.push({ 
+                                command: `flag ${flag}`,
+                                description: `Set ${flag} flag`
+                            });
+                        }
+                    });
+                } else if (firstWord === 'flag' && words.length === 3) {
+                    const value = words[2];
+                    ['on', 'off'].forEach(opt => {
+                        if (opt.startsWith(value)) {
+                            suggestions.push({
+                                command: `flag ${words[1]} ${opt}`,
+                                description: `Set ${words[1]} to ${opt}`
+                            });
+                        }
+                    });
+                }
+            }
+
+            if (suggestions.length > 0) {
+                showSuggestions();
+            } else {
+                hideSuggestions();
+            }
+        }
+
+        // Show suggestions
+        function showSuggestions() {
+            suggestionsContainer.innerHTML = '';
+            selectedSuggestionIndex = -1;
+
+            suggestions.forEach((suggestion, index) => {
+                const div = document.createElement('div');
+                div.className = 'suggestion-item';
+                div.innerHTML = `
+                    <span class="suggestion-cmd">${escapeHtml(suggestion.command)}</span>
+                    <span class="suggestion-desc">${escapeHtml(suggestion.description)}</span>
+                `;
+                div.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    applySuggestion(index);
+                });
+                suggestionsContainer.appendChild(div);
+            });
+
+            suggestionsContainer.style.display = 'block';
+        }
+
+        // Hide suggestions
+        function hideSuggestions() {
+            suggestionsContainer.style.display = 'none';
+            suggestions = [];
+            selectedSuggestionIndex = -1;
+        }
+
+        // Apply suggestion
+        function applySuggestion(index) {
+            if (index >= 0 && index < suggestions.length) {
+                commandInput.value = suggestions[index].command;
+                hideSuggestions();
+                commandInput.focus();
+            }
+        }
+
+        // Navigate suggestions
+        function navigateSuggestions(direction) {
+            if (suggestions.length === 0) return;
+
+            selectedSuggestionIndex += direction;
+
+            if (selectedSuggestionIndex < 0) {
+                selectedSuggestionIndex = suggestions.length - 1;
+            } else if (selectedSuggestionIndex >= suggestions.length) {
+                selectedSuggestionIndex = 0;
+            }
+
+            // Update visual selection
+            const items = suggestionsContainer.querySelectorAll('.suggestion-item');
+            items.forEach((item, idx) => {
+                if (idx === selectedSuggestionIndex) {
+                    item.classList.add('selected');
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+        }
 
         // Add output line
         function addLine(text, cssClass = '') {
@@ -56,8 +204,18 @@
 
         // Handle keyboard input
         commandInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Tab') {
                 e.preventDefault();
+                if (suggestions.length > 0) {
+                    const index = selectedSuggestionIndex >= 0 ? selectedSuggestionIndex : 0;
+                    applySuggestion(index);
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                hideSuggestions();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                hideSuggestions();
                 const command = commandInput.value.trim();
                 
                 if (command) {
@@ -81,14 +239,18 @@
                 }
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
-                if (history.length > 0) {
+                if (suggestions.length > 0 && suggestionsContainer.style.display === 'block') {
+                    navigateSuggestions(-1);
+                } else if (history.length > 0) {
                     if (historyIndex === -1) historyIndex = history.length;
                     historyIndex = Math.max(0, historyIndex - 1);
                     commandInput.value = history[historyIndex];
                 }
             } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                if (historyIndex !== -1) {
+                if (suggestions.length > 0 && suggestionsContainer.style.display === 'block') {
+                    navigateSuggestions(1);
+                } else if (historyIndex !== -1) {
                     historyIndex++;
                     if (historyIndex >= history.length) {
                         historyIndex = -1;

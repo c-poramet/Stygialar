@@ -94,6 +94,7 @@ body {
     padding: 10px 20px;
     background-color: #000;
     border-top: 1px solid #003300;
+    position: relative;
 }
 
 .input-field {
@@ -105,6 +106,72 @@ body {
     outline: none;
     flex: 1;
     caret-color: #00ff00;
+}
+
+/* Autocomplete suggestions */
+.suggestions-container {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    background-color: #001100;
+    border: 1px solid #00ff00;
+    border-bottom: none;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+.suggestions-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.suggestions-container::-webkit-scrollbar-track {
+    background: #000;
+}
+
+.suggestions-container::-webkit-scrollbar-thumb {
+    background: #00ff00;
+}
+
+.suggestion-item {
+    padding: 8px 20px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #003300;
+    transition: background-color 0.1s;
+}
+
+.suggestion-item:hover,
+.suggestion-item.selected {
+    background-color: #00ff00;
+    color: #000;
+}
+
+.suggestion-item:hover .suggestion-cmd,
+.suggestion-item.selected .suggestion-cmd,
+.suggestion-item:hover .suggestion-desc,
+.suggestion-item.selected .suggestion-desc {
+    color: #000;
+}
+
+.suggestion-cmd {
+    color: #00ff00;
+    font-weight: bold;
+    margin-right: 20px;
+}
+
+.suggestion-desc {
+    color: #00aaff;
+    font-size: 0.9em;
+}
+
+.suggestion-item:hover .suggestion-desc,
+.suggestion-item.selected .suggestion-desc {
+    color: #000;
+    opacity: 0.7;
 }
 
 /* Legacy styles */
