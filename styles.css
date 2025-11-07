@@ -140,8 +140,10 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 20px;
     border-bottom: 1px solid #003300;
     transition: background-color 0.1s;
+    min-height: 30px;
 }
 
 .suggestion-item:hover,
@@ -161,11 +163,18 @@ body {
     color: #00ff00;
     font-weight: bold;
     margin-right: 20px;
+    flex-shrink: 0;
+    min-width: 120px;
 }
 
 .suggestion-desc {
     color: #00aaff;
     font-size: 0.9em;
+    flex: 1;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .suggestion-item:hover .suggestion-desc,
