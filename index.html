@@ -62,6 +62,23 @@
             'solve': 'Solve with flags: --pi, --fraction, --integer, --positive'
         };
 
+        const solveFlags = {
+            '--pi': 'Display solutions as multiples of π',
+            '--fraction': 'Display solutions as fractions',
+            '--integer': 'Round solutions to integers',
+            '--positive': 'Only accept positive solutions',
+            '--complex': 'Enable complex solutions (future)'
+        };
+
+        const helpTopics = {
+            'input': 'Help for input command',
+            'solve': 'Help for solve command and flags',
+            'showinputs': 'Help for showinputs command',
+            'deleteinputs': 'Help for deleteinputs command',
+            'clearinputs': 'Help for clearinputs command',
+            'exit': 'Help for exit command'
+        };
+
         // Focus input on load
         commandInput.focus();
 
@@ -99,28 +116,39 @@
                 }
             }
 
-            // Add flag suggestions for eqsolver
+            // Add specific suggestions based on command context
             if (currentApp === 'eqsolver') {
-                if (firstWord === 'flag' && words.length === 2) {
-                    const flagStart = words[1];
-                    ['complex', 'integer', 'positive'].forEach(flag => {
-                        if (flag.startsWith(flagStart)) {
-                            suggestions.push({ 
-                                command: `flag ${flag}`,
-                                description: `Set ${flag} flag`
-                            });
-                        }
-                    });
-                } else if (firstWord === 'flag' && words.length === 3) {
-                    const value = words[2];
-                    ['on', 'off'].forEach(opt => {
-                        if (opt.startsWith(value)) {
+                // Help command suggestions
+                if (firstWord === 'help' && words.length === 2) {
+                    const topicStart = words[1];
+                    for (const [topic, desc] of Object.entries(helpTopics)) {
+                        if (topic.startsWith(topicStart)) {
                             suggestions.push({
-                                command: `flag ${words[1]} ${opt}`,
-                                description: `Set ${words[1]} to ${opt}`
+                                command: `help ${topic}`,
+                                description: desc
                             });
                         }
-                    });
+                    }
+                }
+                
+                // Solve command flag suggestions
+                if (firstWord === 'solve') {
+                    const lastWord = words[words.length - 1];
+                    
+                    // If typing a flag or command just entered
+                    if (words.length === 1 || lastWord.startsWith('--') || words[words.length - 2] !== words[words.length - 1]) {
+                        for (const [flag, desc] of Object.entries(solveFlags)) {
+                            // Don't suggest flags already used
+                            if (!input.includes(flag) && flag.startsWith(lastWord)) {
+                                const currentFlags = words.slice(1).filter(w => w.startsWith('--'));
+                                const newCmd = `solve ${currentFlags.join(' ')} ${flag}`.trim();
+                                suggestions.push({
+                                    command: newCmd,
+                                    description: desc
+                                });
+                            }
+                        }
+                    }
                 }
             }
 
@@ -357,8 +385,10 @@
                         addLine('  clearinputs           - Clear all equations');
                         addLine('  solve [flags]         - Solve the system of equations');
                         addLine('&nbsp;');
-                        addLine('<span class="dim">Available flags: --pi, --fraction, --integer, --positive, --complex</span>');
-                        addLine('<span class="dim">Use "help solve" for flag details</span>');
+                        addLine('<span class="dim">Available solve flags: --pi, --fraction, --integer, --positive, --complex</span>');
+                        addLine('<span class="dim">Type "help <command>" for details (e.g., help solve, help input)</span>');
+                        addLine('<span class="dim">Start typing "help " to see available help topics</span>');
+                        addLine('&nbsp;');
                         addLine('<span class="dim">Supports: Linear, polynomial, trigonometric (sin, cos, tan)</span>');
                         addLine('<span class="dim">Functions: sqrt, exp, ln, log, abs, pi, e</span>');
                     } else {
@@ -380,6 +410,8 @@
                                 addLine('<span class="dim">Supported operators: +, -, *, /, ^</span>');
                                 addLine('<span class="dim">Functions: sin, cos, tan, sqrt, exp, ln, log, abs</span>');
                                 addLine('<span class="dim">Constants: pi, e</span>');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Note: Use "solve --flags" to control output format</span>');
                                 break;
                                 
                             case 'solve':
@@ -389,16 +421,16 @@
                                 addLine('  solve [--flag1] [--flag2] ...');
                                 addLine('&nbsp;');
                                 addLine('<span class="dim">Available Flags:</span>');
-                                addLine('  --pi         Display solutions as multiples of π (e.g., π/2, 3π/4)');
-                                addLine('  --fraction   Display solutions as fractions (e.g., 1/3, 5/2)');
-                                addLine('  --integer    Round solutions to nearest integer');
-                                addLine('  --positive   Only accept positive solutions');
-                                addLine('  --complex    Enable complex number solutions (future)');
+                                for (const [flag, desc] of Object.entries(solveFlags)) {
+                                    addLine(`  <span class="accent">${flag.padEnd(12)}</span> ${desc}`);
+                                }
                                 addLine('&nbsp;');
                                 addLine('<span class="dim">Examples:</span>');
                                 addLine('  solve --pi');
                                 addLine('  solve --fraction --positive');
                                 addLine('  solve --integer');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Tip: Start typing "solve --" to see flag suggestions</span>');
                                 break;
                                 
                             case 'showinputs':
