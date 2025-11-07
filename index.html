@@ -59,9 +59,7 @@
             'showinputs': 'Display all equations',
             'deleteinputs': 'Delete equations by index',
             'clearinputs': 'Clear all equations',
-            'solve': 'Solve the system of equations',
-            'flag': 'Set solver flags (complex, integer, positive, pi, fraction)',
-            'showflags': 'Show current flags'
+            'solve': 'Solve with flags: --pi, --fraction, --integer, --positive'
         };
 
         // Focus input on load
@@ -345,27 +343,109 @@
 
             switch(command) {
                 case 'help':
+                    const helpTopic = parts[1]?.toLowerCase();
                     addLine('&nbsp;');
-                    addLine('<span class="accent">EqSolver Commands:</span>');
-                    addLine('  help                  - Show this help message');
-                    addLine('  exit                  - Exit equation solver');
-                    addLine('  input <equation>      - Add equation (e.g., input 3x + y = 8)');
-                    addLine('  showinputs            - Display all equations');
-                    addLine('  deleteinputs <idx...> - Delete equations by index');
-                    addLine('  clearinputs           - Clear all equations');
-                    addLine('  solve                 - Solve the system of equations');
-                    addLine('  flag <name> <on|off>  - Set solver flags');
-                    addLine('  showflags             - Show current flags');
-                    addLine('&nbsp;');
-                    addLine('<span class="dim">Available flags: complex, integer, positive, pi, fraction</span>');
-                    addLine('<span class="dim">  pi - Display solutions as multiples of π (e.g., π/2)</span>');
-                    addLine('<span class="dim">  fraction - Display solutions as fractions (e.g., 1/3)</span>');
-                    addLine('<span class="dim">Supports: Linear, polynomial, trigonometric (sin, cos, tan)</span>');
-                    addLine('<span class="dim">Functions: sqrt, exp, ln, log, abs, pi, e</span>');
-                    addLine('<span class="dim">Examples:</span>');
-                    addLine('<span class="dim">  Linear: input 2x - 3y = 6, 3x + y = 8</span>');
-                    addLine('<span class="dim">  Nonlinear: input x^2 + y^2 = 25, x - y = 1</span>');
-                    addLine('<span class="dim">  Trig: input sin(x) = 0.5</span>');
+                    
+                    if (!helpTopic) {
+                        // General help
+                        addLine('<span class="accent">EqSolver Commands:</span>');
+                        addLine('  help [command]        - Show help (use help <command> for details)');
+                        addLine('  exit                  - Exit equation solver');
+                        addLine('  input <equation>      - Add equation');
+                        addLine('  showinputs            - Display all equations');
+                        addLine('  deleteinputs <idx...> - Delete equations by index');
+                        addLine('  clearinputs           - Clear all equations');
+                        addLine('  solve [flags]         - Solve the system of equations');
+                        addLine('&nbsp;');
+                        addLine('<span class="dim">Available flags: --pi, --fraction, --integer, --positive, --complex</span>');
+                        addLine('<span class="dim">Use "help solve" for flag details</span>');
+                        addLine('<span class="dim">Supports: Linear, polynomial, trigonometric (sin, cos, tan)</span>');
+                        addLine('<span class="dim">Functions: sqrt, exp, ln, log, abs, pi, e</span>');
+                    } else {
+                        // Command-specific help
+                        switch(helpTopic) {
+                            case 'input':
+                                addLine('<span class="accent">input - Add equations to solve</span>');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Usage:</span>');
+                                addLine('  input <equation>');
+                                addLine('  input <eq1>, <eq2>, ...');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Examples:</span>');
+                                addLine('  input 3x + y = 8');
+                                addLine('  input 2x - 3y = 6, 3x + y = 8');
+                                addLine('  input x^2 + y^2 = 25');
+                                addLine('  input sin(x) = 0.5');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Supported operators: +, -, *, /, ^</span>');
+                                addLine('<span class="dim">Functions: sin, cos, tan, sqrt, exp, ln, log, abs</span>');
+                                addLine('<span class="dim">Constants: pi, e</span>');
+                                break;
+                                
+                            case 'solve':
+                                addLine('<span class="accent">solve - Solve the system of equations</span>');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Usage:</span>');
+                                addLine('  solve [--flag1] [--flag2] ...');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Available Flags:</span>');
+                                addLine('  --pi         Display solutions as multiples of π (e.g., π/2, 3π/4)');
+                                addLine('  --fraction   Display solutions as fractions (e.g., 1/3, 5/2)');
+                                addLine('  --integer    Round solutions to nearest integer');
+                                addLine('  --positive   Only accept positive solutions');
+                                addLine('  --complex    Enable complex number solutions (future)');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Examples:</span>');
+                                addLine('  solve --pi');
+                                addLine('  solve --fraction --positive');
+                                addLine('  solve --integer');
+                                break;
+                                
+                            case 'showinputs':
+                                addLine('<span class="accent">showinputs - Display all equations</span>');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Usage:</span>');
+                                addLine('  showinputs');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Shows all equations currently in the system with their indices.</span>');
+                                break;
+                                
+                            case 'deleteinputs':
+                                addLine('<span class="accent">deleteinputs - Delete specific equations</span>');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Usage:</span>');
+                                addLine('  deleteinputs <index1> [index2] ...');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Examples:</span>');
+                                addLine('  deleteinputs 1');
+                                addLine('  deleteinputs 1 3 5');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Use "showinputs" to see equation indices.</span>');
+                                break;
+                                
+                            case 'clearinputs':
+                                addLine('<span class="accent">clearinputs - Clear all equations</span>');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Usage:</span>');
+                                addLine('  clearinputs');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Removes all equations from the system.</span>');
+                                break;
+                                
+                            case 'exit':
+                                addLine('<span class="accent">exit - Exit equation solver</span>');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Usage:</span>');
+                                addLine('  exit');
+                                addLine('&nbsp;');
+                                addLine('<span class="dim">Returns to the root terminal.</span>');
+                                break;
+                                
+                            default:
+                                addLine(`<span class="error">No help available for: ${helpTopic}</span>`);
+                                addLine('<span class="dim">Available commands: input, solve, showinputs, deleteinputs, clearinputs, exit</span>');
+                        }
+                    }
                     addLine('&nbsp;');
                     break;
 
@@ -441,6 +521,30 @@
 
                 case 'solve':
                     try {
+                        // Parse flags from command
+                        const flags = {
+                            pi: false,
+                            fraction: false,
+                            integer: false,
+                            positive: false,
+                            complex: false
+                        };
+                        
+                        for (let i = 1; i < parts.length; i++) {
+                            const arg = parts[i].toLowerCase();
+                            if (arg.startsWith('--')) {
+                                const flagName = arg.substring(2);
+                                if (flags.hasOwnProperty(flagName)) {
+                                    flags[flagName] = true;
+                                } else {
+                                    addLine(`<span class="warning">Unknown flag: ${arg}</span>`);
+                                }
+                            }
+                        }
+                        
+                        // Apply flags to solver
+                        EqSolver.flags = flags;
+                        
                         const result = EqSolver.solve();
                         addLine('&nbsp;');
                         
@@ -467,7 +571,8 @@
                                 if (val === null) {
                                     addLine(`<span class="warning">  ${v} = No valid solution (constraint violation)</span>`);
                                 } else {
-                                    addLine(`<span class="accent">  ${v} = ${val.toFixed(6)}</span>`);
+                                    const displayVal = typeof val === 'number' ? val.toFixed(6) : val;
+                                    addLine(`<span class="accent">  ${v} = ${displayVal}</span>`);
                                 }
                             }
                         } else if (result.status === 'parametric' || result.status === 'partial') {
@@ -504,42 +609,8 @@
                     }
                     break;
 
-                case 'flag':
-                    if (parts.length < 3) {
-                        addLine('<span class="error">Usage: flag <name> <on|off></span>');
-                        addLine('<span class="dim">Available flags: complex, integer, positive, pi, fraction</span>');
-                        addLine('&nbsp;');
-                        break;
-                    }
-
-                    const flagName = parts[1].toLowerCase();
-                    const flagValue = parts[2].toLowerCase() === 'on';
-                    
-                    if (EqSolver.setFlag(flagName, flagValue)) {
-                        addLine(`<span class="dim">Flag '${flagName}' set to ${flagValue ? 'ON' : 'OFF'}</span>`);
-                        addLine('&nbsp;');
-                    } else {
-                        addLine(`<span class="error">Unknown flag: ${flagName}</span>`);
-                        addLine('<span class="dim">Available flags: complex, integer, positive, pi, fraction</span>');
-                        addLine('&nbsp;');
-                    }
-                    break;
-
-                case 'showflags':
-                    addLine('&nbsp;');
-                    addLine('<span class="accent">Current flags:</span>');
-                    for (const [flag, value] of Object.entries(EqSolver.flags)) {
-                        const status = value ? '<span class="accent">ON</span>' : '<span class="dim">OFF</span>';
-                        addLine(`  ${flag.padEnd(10)} : ${status}`);
-                    }
-                    addLine('&nbsp;');
-                    break;
-
-                case '':
-                    break;
-
                 default:
-                    addLine(`<span class="error">Unknown command: ${escapeHtml(command)}</span>`);
+                    addLine(`<span class="error">Unknown command: ${command}</span>`);
                     addLine('<span class="dim">Type "help" for available commands</span>');
                     addLine('&nbsp;');
             }

@@ -411,14 +411,6 @@ const EqSolver = {
         return `${sign}${bestNumerator}/${bestDenominator}`;
     },
 
-    setFlag(flag, value) {
-        if (flag in this.flags) {
-            this.flags[flag] = value;
-            return true;
-        }
-        return false;
-    },
-
     // Nonlinear equation solver using Newton-Raphson method
     solveNonlinear() {
         try {
