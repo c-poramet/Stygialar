@@ -16,7 +16,9 @@ const EqSolver = {
         this.flags = {
             complex: false,
             integer: false,
-            positive: false
+            positive: false,
+            pi: false,
+            fraction: false
         };
     },
 
@@ -284,7 +286,7 @@ const EqSolver = {
 
                         if (deps.length === 0) {
                             // Unique solution for this variable
-                            solution[v] = this.applyConstraints(value);
+                            solution[v] = this.formatOutput(value);
                         } else {
                             // Parametric solution
                             const terms = deps.map(d => {
@@ -333,6 +335,80 @@ const EqSolver = {
         }
 
         return result;
+    },
+
+    formatOutput(value) {
+        if (value === null) return null;
+
+        // Apply constraints first
+        value = this.applyConstraints(value);
+        if (value === null) return null;
+
+        // Format as PI if flag is set
+        if (this.flags.pi) {
+            const piRatio = value / Math.PI;
+            
+            // Check if it's close to a simple fraction of PI
+            const tolerance = 1e-6;
+            const denominators = [1, 2, 3, 4, 6, 8, 12];
+            
+            for (const denom of denominators) {
+                const numerator = Math.round(piRatio * denom);
+                if (Math.abs(piRatio - numerator / denom) < tolerance) {
+                    if (numerator === 0) return '0';
+                    if (numerator === denom) return 'π';
+                    if (numerator === -denom) return '-π';
+                    if (denom === 1) return `${numerator}π`;
+                    
+                    const sign = numerator < 0 ? '-' : '';
+                    const absNum = Math.abs(numerator);
+                    if (absNum === 1) return `${sign}π/${denom}`;
+                    return `${sign}${absNum}π/${denom}`;
+                }
+            }
+            
+            // Not a simple fraction of PI, show decimal with π notation
+            return `${piRatio.toFixed(6)}π`;
+        }
+
+        // Format as fraction if flag is set
+        if (this.flags.fraction) {
+            return this.toFraction(value);
+        }
+
+        return value;
+    },
+
+    toFraction(decimal, maxDenominator = 10000) {
+        if (Math.abs(decimal - Math.round(decimal)) < 1e-9) {
+            return Math.round(decimal).toString();
+        }
+
+        const sign = decimal < 0 ? '-' : '';
+        decimal = Math.abs(decimal);
+
+        let bestNumerator = 1;
+        let bestDenominator = 1;
+        let minError = Math.abs(decimal - 1);
+
+        for (let denominator = 1; denominator <= maxDenominator; denominator++) {
+            const numerator = Math.round(decimal * denominator);
+            const error = Math.abs(decimal - numerator / denominator);
+            
+            if (error < minError) {
+                minError = error;
+                bestNumerator = numerator;
+                bestDenominator = denominator;
+            }
+            
+            if (error < 1e-9) break;
+        }
+
+        if (bestDenominator === 1) {
+            return `${sign}${bestNumerator}`;
+        }
+
+        return `${sign}${bestNumerator}/${bestDenominator}`;
     },
 
     setFlag(flag, value) {
@@ -449,7 +525,7 @@ const EqSolver = {
             
             if (Math.abs(fx) < tolerance) {
                 // Found solution
-                const result = this.applyConstraints(x);
+                const result = this.formatOutput(x);
                 if (result === null) {
                     return { status: 'error', message: 'Solution violates constraints' };
                 }
@@ -523,10 +599,10 @@ const EqSolver = {
             // Check convergence
             const norm = Math.sqrt(F.reduce((sum, fi) => sum + fi * fi, 0));
             if (norm < tolerance) {
-                // Apply constraints
+                // Apply constraints and format
                 const solution = {};
                 for (const v of variables) {
-                    const val = this.applyConstraints(x[v]);
+                    const val = this.formatOutput(x[v]);
                     if (val === null) {
                         return { status: 'error', message: `Solution for ${v} violates constraints` };
                     }
