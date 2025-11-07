@@ -5,108 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>STYGIALAR SYSTEM</title>
     
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            background-color: #000;
-            color: #00ff00;
-            font-family: 'Courier New', monospace;
-            overflow: hidden;
-            height: 100vh;
-            width: 100vw;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .terminal-container {
-            flex: 1;
-            width: 100%;
-            background-color: #000;
-            padding: 20px;
-            padding-bottom: 0;
-            overflow-y: auto;
-            overflow-x: hidden;
-        }
-
-        .terminal-container::-webkit-scrollbar {
-            width: 10px;
-        }
-
-        .terminal-container::-webkit-scrollbar-track {
-            background: #001100;
-        }
-
-        .terminal-container::-webkit-scrollbar-thumb {
-            background: #00ff00;
-            border: 1px solid #000;
-        }
-
-        .terminal-output {
-            margin-bottom: 10px;
-            line-height: 1.6;
-        }
-
-        .line {
-            margin: 5px 0;
-        }
-
-        .prompt {
-            color: #00ff00;
-        }
-
-        .accent {
-            color: #00aaff;
-        }
-
-        .warning {
-            color: #ffaa00;
-        }
-
-        .error {
-            color: #ff0000;
-        }
-
-        .dim {
-            color: #008800;
-        }
-
-        .cursor {
-            display: inline-block;
-            width: 8px;
-            height: 16px;
-            background-color: #00ff00;
-            animation: blink 1s step-end infinite;
-            margin-left: 2px;
-        }
-
-        @keyframes blink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0; }
-        }
-
-        .input-line {
-            display: flex;
-            padding: 10px 20px;
-            background-color: #000;
-            border-top: 1px solid #003300;
-        }
-
-        .input-field {
-            background: transparent;
-            border: none;
-            color: #00ff00;
-            font-family: 'Courier New', monospace;
-            font-size: 16px;
-            outline: none;
-            flex: 1;
-            caret-color: #00ff00;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
+    <script src="scripts/eqsolver.js"></script>
 </head>
 <body>
     <div class="terminal-container" id="terminal">
@@ -118,7 +18,7 @@
     </div>
 
     <div class="input-line">
-        <span class="prompt">root@stygialar</span>&nbsp;<span class="accent">~$</span>&nbsp;
+        <span class="prompt" id="promptUser">root@stygialar</span>&nbsp;<span class="accent" id="promptPath">~$</span>&nbsp;
         <input type="text" class="input-field" id="commandInput" autocomplete="off" autofocus>
         <span class="cursor"></span>
     </div>
@@ -127,6 +27,11 @@
         const commandInput = document.getElementById('commandInput');
         const output = document.getElementById('output');
         const terminal = document.getElementById('terminal');
+        const promptUser = document.getElementById('promptUser');
+        const promptPath = document.getElementById('promptPath');
+
+        // Application state
+        let currentApp = null; // null = root, 'eqsolver' = equation solver
 
         // Command history
         const history = [];
@@ -160,11 +65,16 @@
                     history.push(command);
                     historyIndex = -1;
                     
-                    // Display command
-                    addLine('<span class="prompt">root@stygialar</span> <span class="accent">~$</span> ' + command);
+                    // Display command with current prompt
+                    const promptText = `<span class="prompt">${promptUser.textContent}</span> <span class="accent">${promptPath.textContent}</span>`;
+                    addLine(promptText + ' ' + escapeHtml(command));
                     
-                    // Execute command
-                    executeCommand(command.toLowerCase());
+                    // Execute command based on current app
+                    if (currentApp === null) {
+                        executeRootCommand(command);
+                    } else if (currentApp === 'eqsolver') {
+                        executeEqSolverCommand(command);
+                    }
                     
                     // Clear input
                     commandInput.value = '';
@@ -190,7 +100,268 @@
             }
         });
 
-        // Execute commands
+        // Update prompt based on current app
+        function updatePrompt() {
+            if (currentApp === null) {
+                promptUser.textContent = 'root@stygialar';
+                promptPath.textContent = '~$';
+            } else if (currentApp === 'eqsolver') {
+                promptUser.textContent = 'eqsolver';
+                promptPath.textContent = '>';
+            }
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Execute root commands
+        function executeRootCommand(cmd) {
+            const command = cmd.toLowerCase();
+
+            switch(command) {
+                case 'help':
+                    addLine('&nbsp;');
+                    addLine('<span class="accent">Available commands:</span>');
+                    addLine('  help     - Show this help message');
+                    addLine('  clear    - Clear terminal screen');
+                    addLine('  ls       - List available programs');
+                    addLine('  eqsolver - Launch equation solver');
+                    addLine('  about    - About this system');
+                    addLine('&nbsp;');
+                    break;
+                
+                case 'clear':
+                    output.innerHTML = '';
+                    break;
+                    
+                case 'ls':
+                    addLine('&nbsp;');
+                    addLine('eqsolver');
+                    addLine('solver/');
+                    addLine('&nbsp;');
+                    break;
+
+                case 'eqsolver':
+                    currentApp = 'eqsolver';
+                    updatePrompt();
+                    EqSolver.reset();
+                    addLine('&nbsp;');
+                    addLine('<span class="accent">╔═══════════════════════════════════════╗</span>');
+                    addLine('<span class="accent">║     EQUATION SOLVER v1.0              ║</span>');
+                    addLine('<span class="accent">╚═══════════════════════════════════════╝</span>');
+                    addLine('&nbsp;');
+                    addLine('<span class="dim">Type "help" for available commands</span>');
+                    addLine('&nbsp;');
+                    break;
+                    
+                case 'about':
+                    addLine('&nbsp;');
+                    addLine('<span class="accent">STYGIALAR SYSTEM v1.0</span>');
+                    addLine('A terminal-based puzzle solving system');
+                    addLine('&nbsp;');
+                    break;
+                    
+                case '':
+                    break;
+                    
+                default:
+                    addLine('<span class="error">Command not found: ' + escapeHtml(command) + '</span>');
+                    addLine('<span class="dim">Type "help" for available commands</span>');
+                    addLine('&nbsp;');
+            }
+        }
+
+        // Execute equation solver commands
+        function executeEqSolverCommand(cmd) {
+            const parts = cmd.split(' ');
+            const command = parts[0].toLowerCase();
+
+            switch(command) {
+                case 'help':
+                    addLine('&nbsp;');
+                    addLine('<span class="accent">EqSolver Commands:</span>');
+                    addLine('  help                  - Show this help message');
+                    addLine('  exit                  - Exit equation solver');
+                    addLine('  input <equation>      - Add equation (e.g., input 3x + y = 8)');
+                    addLine('  showinputs            - Display all equations');
+                    addLine('  deleteinputs <idx...> - Delete equations by index');
+                    addLine('  solve                 - Solve the system of equations');
+                    addLine('  flag <name> <on|off>  - Set solver flags');
+                    addLine('  showflags             - Show current flags');
+                    addLine('&nbsp;');
+                    addLine('<span class="dim">Available flags: complex, integer, positive</span>');
+                    addLine('<span class="dim">Example: input 2x - 3y = 6, 3x + y = 8</span>');
+                    addLine('&nbsp;');
+                    break;
+
+                case 'exit':
+                    currentApp = null;
+                    updatePrompt();
+                    addLine('<span class="dim">Exiting equation solver...</span>');
+                    addLine('&nbsp;');
+                    break;
+
+                case 'input':
+                    try {
+                        // Join the rest and split by comma for multiple equations
+                        const eqString = parts.slice(1).join(' ');
+                        const equations = eqString.split(',').map(e => e.trim()).filter(e => e);
+                        
+                        if (equations.length === 0) {
+                            addLine('<span class="error">Usage: input <equation></span>');
+                            addLine('<span class="dim">Example: input 3x + y = 8</span>');
+                            addLine('<span class="dim">Multiple: input 3x + y = 8, 2x - 3y = 6</span>');
+                            addLine('&nbsp;');
+                            break;
+                        }
+
+                        for (const eq of equations) {
+                            const idx = EqSolver.addEquation(eq);
+                            addLine(`<span class="dim">Added equation [${idx}]: ${escapeHtml(eq)}</span>`);
+                        }
+                        addLine('&nbsp;');
+                    } catch (error) {
+                        addLine(`<span class="error">Error: ${escapeHtml(error.message)}</span>`);
+                        addLine('&nbsp;');
+                    }
+                    break;
+
+                case 'showinputs':
+                    if (EqSolver.equations.length === 0) {
+                        addLine('<span class="dim">No equations entered yet</span>');
+                        addLine('&nbsp;');
+                    } else {
+                        addLine('&nbsp;');
+                        addLine('<span class="accent">Current equations:</span>');
+                        const display = EqSolver.showEquations();
+                        display.forEach(eq => addLine('  ' + eq));
+                        addLine('&nbsp;');
+                    }
+                    break;
+
+                case 'deleteinputs':
+                    try {
+                        const indices = parts.slice(1).map(n => parseInt(n)).filter(n => !isNaN(n));
+                        if (indices.length === 0) {
+                            addLine('<span class="error">Usage: deleteinputs <index> [index2] ...</span>');
+                            addLine('<span class="dim">Example: deleteinputs 0 2</span>');
+                            addLine('&nbsp;');
+                            break;
+                        }
+
+                        EqSolver.deleteEquations(indices);
+                        addLine(`<span class="dim">Deleted equations at indices: ${indices.join(', ')}</span>`);
+                        addLine('&nbsp;');
+                    } catch (error) {
+                        addLine(`<span class="error">Error: ${escapeHtml(error.message)}</span>`);
+                        addLine('&nbsp;');
+                    }
+                    break;
+
+                case 'solve':
+                    try {
+                        const result = EqSolver.solve();
+                        addLine('&nbsp;');
+                        
+                        if (result.status === 'error') {
+                            addLine(`<span class="error">${result.message}</span>`);
+                        } else if (result.status === 'unsolvable') {
+                            addLine('<span class="warning">╔═══════════════════════════════════════╗</span>');
+                            addLine('<span class="warning">║  UNSOLVABLE                           ║</span>');
+                            addLine('<span class="warning">╚═══════════════════════════════════════╝</span>');
+                            addLine(`<span class="error">${result.message}</span>`);
+                        } else if (result.status === 'unique') {
+                            addLine('<span class="accent">╔═══════════════════════════════════════╗</span>');
+                            addLine('<span class="accent">║  UNIQUE SOLUTION FOUND                ║</span>');
+                            addLine('<span class="accent">╚═══════════════════════════════════════╝</span>');
+                            addLine('&nbsp;');
+                            for (const [v, val] of Object.entries(result.solution)) {
+                                if (val === null) {
+                                    addLine(`<span class="warning">  ${v} = No valid solution (constraint violation)</span>`);
+                                } else {
+                                    addLine(`<span class="accent">  ${v} = ${val.toFixed(6)}</span>`);
+                                }
+                            }
+                        } else if (result.status === 'parametric' || result.status === 'partial') {
+                            addLine('<span class="warning">╔═══════════════════════════════════════╗</span>');
+                            addLine('<span class="warning">║  INFINITELY MANY SOLUTIONS            ║</span>');
+                            addLine('<span class="warning">╚═══════════════════════════════════════╝</span>');
+                            addLine('&nbsp;');
+                            addLine(`<span class="dim">${result.message}</span>`);
+                            addLine('&nbsp;');
+                            
+                            if (Object.keys(result.solution).length > 0) {
+                                addLine('<span class="accent">Fixed variables:</span>');
+                                for (const [v, val] of Object.entries(result.solution)) {
+                                    addLine(`  ${v} = ${val.toFixed(6)}`);
+                                }
+                                addLine('&nbsp;');
+                            }
+                            
+                            if (result.relations && result.relations.length > 0) {
+                                addLine('<span class="accent">Parametric relations:</span>');
+                                result.relations.forEach(rel => addLine(`  ${rel}`));
+                                addLine('&nbsp;');
+                            }
+                            
+                            if (result.freeVariables && result.freeVariables.length > 0) {
+                                addLine(`<span class="dim">Free variables: ${result.freeVariables.join(', ')}</span>`);
+                            }
+                        }
+                        
+                        addLine('&nbsp;');
+                    } catch (error) {
+                        addLine(`<span class="error">Error: ${escapeHtml(error.message)}</span>`);
+                        addLine('&nbsp;');
+                    }
+                    break;
+
+                case 'flag':
+                    if (parts.length < 3) {
+                        addLine('<span class="error">Usage: flag <name> <on|off></span>');
+                        addLine('<span class="dim">Available flags: complex, integer, positive</span>');
+                        addLine('&nbsp;');
+                        break;
+                    }
+
+                    const flagName = parts[1].toLowerCase();
+                    const flagValue = parts[2].toLowerCase() === 'on';
+                    
+                    if (EqSolver.setFlag(flagName, flagValue)) {
+                        addLine(`<span class="dim">Flag '${flagName}' set to ${flagValue ? 'ON' : 'OFF'}</span>`);
+                        addLine('&nbsp;');
+                    } else {
+                        addLine(`<span class="error">Unknown flag: ${flagName}</span>`);
+                        addLine('<span class="dim">Available flags: complex, integer, positive</span>');
+                        addLine('&nbsp;');
+                    }
+                    break;
+
+                case 'showflags':
+                    addLine('&nbsp;');
+                    addLine('<span class="accent">Current flags:</span>');
+                    for (const [flag, value] of Object.entries(EqSolver.flags)) {
+                        const status = value ? '<span class="accent">ON</span>' : '<span class="dim">OFF</span>';
+                        addLine(`  ${flag.padEnd(10)} : ${status}`);
+                    }
+                    addLine('&nbsp;');
+                    break;
+
+                case '':
+                    break;
+
+                default:
+                    addLine(`<span class="error">Unknown command: ${escapeHtml(command)}</span>`);
+                    addLine('<span class="dim">Type "help" for available commands</span>');
+                    addLine('&nbsp;');
+            }
+        }
+
+        // Execute commands (legacy, now just routes to root)
         function executeCommand(cmd) {
             const parts = cmd.split(' ');
             const command = parts[0];
@@ -199,14 +370,13 @@
                 case 'help':
                     addLine('&nbsp;');
                     addLine('<span class="accent">Available commands:</span>');
-                    addLine('  help      - Show this help message');
-                    addLine('  clear     - Clear terminal screen');
-                    addLine('  ls        - List available modules');
-                    addLine('  solver    - Launch Light Out Puzzle Solver');
-                    addLine('  about     - About this system');
+                    addLine('  help   - Show this help message');
+                    addLine('  clear  - Clear terminal screen');
+                    addLine('  ls     - List available modules');
+                    addLine('  about  - About this system');
                     addLine('&nbsp;');
                     break;
-                    
+                
                 case 'clear':
                     output.innerHTML = '';
                     break;
@@ -215,14 +385,6 @@
                     addLine('&nbsp;');
                     addLine('solver/');
                     addLine('&nbsp;');
-                    break;
-                    
-                case 'solver':
-                case 'lightout':
-                    addLine('<span class="accent">Launching Light Out Puzzle Solver...</span>');
-                    setTimeout(() => {
-                        window.location.href = 'solver/lightout.html';
-                    }, 300);
                     break;
                     
                 case 'about':
