@@ -250,6 +250,11 @@
                 usage: 'config [uniform <states> | custom]',
                 execute: cmdConfig
             },
+            'cliset': {
+                description: 'Set cell states row by row via CLI',
+                usage: 'cliset',
+                execute: cmdCliSet
+            },
             'clear': {
                 description: 'Clear the terminal output',
                 usage: 'clear',
@@ -659,6 +664,52 @@
             terminalOutput.innerHTML = '';
         }
 
+        function cmdCliSet(args) {
+            addOutput('<span class="output-info">Setting cell states row by row...</span>');
+            addOutput(`<span class="output-info">Enter state values for each row (${puzzleState.gridWidth} values per row).</span>`);
+            addOutput('<span class="output-info">Values should be between 0 and max state-1, separated by spaces.</span>');
+            
+            const newStates = [];
+            let currentRow = 0;
+
+            const processRow = (input) => {
+                const values = input.trim().split(/\s+/).map(v => parseInt(v));
+                
+                if (values.length !== puzzleState.gridWidth) {
+                    addOutput(`<span class="output-error">Expected ${puzzleState.gridWidth} values, got ${values.length}. Try again:</span>`);
+                    waitForInput(processRow);
+                    return;
+                }
+
+                // Validate each value against its maximum state
+                for (let i = 0; i < values.length; i++) {
+                    const cellIndex = currentRow * puzzleState.gridWidth + i;
+                    const maxState = puzzleState.stateConfig ? puzzleState.stateConfig[cellIndex] : puzzleState.maxStates;
+                    
+                    if (isNaN(values[i]) || values[i] < 0 || values[i] >= maxState) {
+                        addOutput(`<span class="output-error">Invalid value at position ${i + 1}. Must be between 0 and ${maxState - 1}. Try again:</span>`);
+                        waitForInput(processRow);
+                        return;
+                    }
+                }
+
+                newStates.push(...values);
+                currentRow++;
+
+                if (currentRow < puzzleState.gridHeight) {
+                    addOutput(`<span class="output-info">Row ${currentRow + 1}:</span>`);
+                    waitForInput(processRow);
+                } else {
+                    puzzleState.cellStates = newStates;
+                    addOutput('<span class="output-success">Cell states updated successfully!</span>');
+                    renderGrid();
+                }
+            };
+
+            addOutput(`<span class="output-info">Row 1:</span>`);
+            waitForInput(processRow);
+        }
+
         function cmdReset(args) {
             initializePuzzle();
             addOutput('<span class="output-success">Puzzle reset to initial state.</span>');
@@ -690,9 +741,173 @@
         }
 
         function cmdSolve(args) {
-            addOutput('<span class="output-info">Solving puzzle...</span>');
-            addOutput('<span class="output-error">Solver algorithm not yet implemented.</span>');
-            addOutput('<span class="output-info">This feature will use Gaussian elimination over GF(n) to find solution.</span>');
+            addOutput('<span class="output-info">Solving puzzle using Gaussian elimination...</span>');
+            
+            try {
+                const solution = solveLightOut();
+                
+                if (solution === null) {
+                    addOutput('<span class="output-error">No solution exists for this configuration!</span>');
+                    addOutput('<span class="output-info">The puzzle may be unsolvable with the current state.</span>');
+                } else if (solution.length === 0) {
+                    addOutput('<span class="output-success">Puzzle is already solved!</span>');
+                } else {
+                    addOutput('<span class="output-success">Solution found!</span>');
+                    addOutput(`<span class="output-info">Number of cells to toggle: ${solution.length}</span>`);
+                    addOutput('&nbsp;');
+                    addOutput('<span class="output-info">Toggle these cells (row, col):</span>');
+                    
+                    for (const cellIndex of solution) {
+                        const row = Math.floor(cellIndex / puzzleState.gridWidth) + 1;
+                        const col = (cellIndex % puzzleState.gridWidth) + 1;
+                        addOutput(`<span class="output-result">  Cell (${row}, ${col})</span>`);
+                    }
+                    
+                    addOutput('&nbsp;');
+                    addOutput('<span class="output-info">Solution matrix:</span>');
+                    for (let i = 0; i < puzzleState.gridHeight; i++) {
+                        let rowStr = '  ';
+                        for (let j = 0; j < puzzleState.gridWidth; j++) {
+                            const idx = i * puzzleState.gridWidth + j;
+                            rowStr += solution.includes(idx) ? '1 ' : '0 ';
+                        }
+                        addOutput(`<span class="output-result">${rowStr}</span>`);
+                    }
+                }
+            } catch (error) {
+                addOutput(`<span class="output-error">Error solving puzzle: ${escapeHtml(error.message)}</span>`);
+            }
+        }
+
+        // Light Out Solver using Gaussian Elimination over GF(n)
+        function solveLightOut() {
+            const width = puzzleState.gridWidth;
+            const height = puzzleState.gridHeight;
+            const totalCells = width * height;
+            
+            // Create augmented matrix for the system
+            // Each row represents an equation for one cell
+            const matrix = [];
+            
+            // Build the coefficient matrix
+            for (let i = 0; i < totalCells; i++) {
+                const row = new Array(totalCells + 1).fill(0);
+                const cellRow = Math.floor(i / width);
+                const cellCol = i % width;
+                const maxState = puzzleState.stateConfig ? puzzleState.stateConfig[i] : puzzleState.maxStates;
+                
+                // Cell affects itself
+                row[i] = 1;
+                
+                // Cell affects neighbors (standard Light Out rules)
+                // Up
+                if (cellRow > 0) {
+                    row[(cellRow - 1) * width + cellCol] = 1;
+                }
+                // Down
+                if (cellRow < height - 1) {
+                    row[(cellRow + 1) * width + cellCol] = 1;
+                }
+                // Left
+                if (cellCol > 0) {
+                    row[cellRow * width + (cellCol - 1)] = 1;
+                }
+                // Right
+                if (cellCol < width - 1) {
+                    row[cellRow * width + (cellCol + 1)] = 1;
+                }
+                
+                // Augmented part: target state (we want to reach 0 from current state)
+                row[totalCells] = (maxState - puzzleState.cellStates[i]) % maxState;
+                
+                matrix.push(row);
+            }
+            
+            // Perform Gaussian elimination in GF(maxStates)
+            // For simplicity, we'll solve for binary (mod 2) case first
+            const mod = puzzleState.maxStates;
+            
+            // Forward elimination
+            let pivot = 0;
+            for (let col = 0; col < totalCells && pivot < totalCells; col++) {
+                // Find pivot
+                let pivotRow = -1;
+                for (let row = pivot; row < totalCells; row++) {
+                    if (matrix[row][col] % mod !== 0) {
+                        pivotRow = row;
+                        break;
+                    }
+                }
+                
+                if (pivotRow === -1) continue;
+                
+                // Swap rows
+                [matrix[pivot], matrix[pivotRow]] = [matrix[pivotRow], matrix[pivot]];
+                
+                // Make pivot element 1 (find modular inverse)
+                const pivotVal = matrix[pivot][col];
+                const pivotInv = modInverse(pivotVal, mod);
+                if (pivotInv === null) continue;
+                
+                for (let j = 0; j <= totalCells; j++) {
+                    matrix[pivot][j] = (matrix[pivot][j] * pivotInv) % mod;
+                }
+                
+                // Eliminate column in other rows
+                for (let row = 0; row < totalCells; row++) {
+                    if (row === pivot) continue;
+                    const factor = matrix[row][col];
+                    for (let j = 0; j <= totalCells; j++) {
+                        matrix[row][j] = (matrix[row][j] - factor * matrix[pivot][j] % mod + mod) % mod;
+                    }
+                }
+                
+                pivot++;
+            }
+            
+            // Check for inconsistency
+            for (let i = pivot; i < totalCells; i++) {
+                let allZero = true;
+                for (let j = 0; j < totalCells; j++) {
+                    if (matrix[i][j] % mod !== 0) {
+                        allZero = false;
+                        break;
+                    }
+                }
+                if (allZero && matrix[i][totalCells] % mod !== 0) {
+                    return null; // No solution
+                }
+            }
+            
+            // Extract solution
+            const solution = [];
+            for (let i = 0; i < totalCells; i++) {
+                // Find leading 1
+                let leadingCol = -1;
+                for (let j = 0; j < totalCells; j++) {
+                    if (matrix[i][j] % mod !== 0) {
+                        leadingCol = j;
+                        break;
+                    }
+                }
+                
+                if (leadingCol !== -1 && matrix[i][totalCells] % mod !== 0) {
+                    solution.push(leadingCol);
+                }
+            }
+            
+            return solution;
+        }
+
+        // Find modular inverse using Extended Euclidean Algorithm
+        function modInverse(a, m) {
+            a = ((a % m) + m) % m;
+            for (let x = 1; x < m; x++) {
+                if ((a * x) % m === 1) {
+                    return x;
+                }
+            }
+            return null;
         }
 
         // Helper functions
