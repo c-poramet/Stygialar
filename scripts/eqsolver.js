@@ -17,7 +17,7 @@ const EqSolver = {
     },
 
     parseEquation(eqStr) {
-        // Parse equation like "3x + y = 8" or "2x - 3y = 6"
+        // Parse equation like "3x + y = 8" or "3x - y = 8 - y"
         const sides = eqStr.split('=');
         if (sides.length !== 2) {
             throw new Error('Invalid equation format. Use format: 3x + y = 8');
@@ -26,32 +26,73 @@ const EqSolver = {
         const lhs = sides[0].trim();
         const rhs = sides[1].trim();
 
-        // Parse right hand side (constant)
-        const constant = parseFloat(rhs);
-        if (isNaN(constant)) {
-            throw new Error('Right side must be a number');
+        // Parse both sides as expressions with terms
+        const lhsTerms = this.parseExpression(lhs);
+        const rhsTerms = this.parseExpression(rhs);
+
+        // Move all terms to left side (lhs - rhs = 0)
+        const terms = { ...lhsTerms };
+        
+        for (const [variable, coef] of Object.entries(rhsTerms)) {
+            if (variable === 'constant') {
+                terms.constant = (terms.constant || 0) - coef;
+            } else {
+                terms[variable] = (terms[variable] || 0) - coef;
+            }
         }
 
-        // Parse left hand side (terms)
-        const terms = {};
-        const termRegex = /([+-]?\s*\d*\.?\d*)\s*([a-z])/gi;
-        let match;
-
-        while ((match = termRegex.exec(lhs)) !== null) {
-            let coef = match[1].replace(/\s/g, '');
-            const variable = match[2].toLowerCase();
-
-            if (coef === '' || coef === '+') coef = '1';
-            else if (coef === '-') coef = '-1';
-
-            terms[variable] = parseFloat(coef);
-        }
+        // Extract constant term
+        const constant = -(terms.constant || 0);
+        delete terms.constant;
 
         if (Object.keys(terms).length === 0) {
             throw new Error('No variables found in equation');
         }
 
         return { terms, constant };
+    },
+
+    parseExpression(expr) {
+        // Parse an expression and return terms with their coefficients
+        const terms = { constant: 0 };
+        
+        // Match both variable terms and constant terms
+        const termRegex = /([+-]?\s*\d*\.?\d*)\s*([a-z])?/gi;
+        let match;
+        let hasContent = false;
+
+        while ((match = termRegex.exec(expr)) !== null) {
+            const fullMatch = match[0].trim();
+            if (!fullMatch || fullMatch === '+' || fullMatch === '-') continue;
+
+            let coef = match[1].replace(/\s/g, '');
+            const variable = match[2] ? match[2].toLowerCase() : null;
+
+            if (variable) {
+                // Variable term
+                if (coef === '' || coef === '+') coef = '1';
+                else if (coef === '-') coef = '-1';
+                
+                const coefNum = parseFloat(coef);
+                if (isNaN(coefNum)) continue;
+                
+                terms[variable] = (terms[variable] || 0) + coefNum;
+                hasContent = true;
+            } else {
+                // Constant term (number only)
+                const coefNum = parseFloat(coef);
+                if (!isNaN(coefNum)) {
+                    terms.constant += coefNum;
+                    hasContent = true;
+                }
+            }
+        }
+
+        if (!hasContent) {
+            throw new Error('Invalid expression format');
+        }
+
+        return terms;
     },
 
     addEquation(eqStr) {
