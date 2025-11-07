@@ -5,6 +5,10 @@
     --accent-color: #7df8b0;
 }
 
+p {
+    font-size: larger;
+}
+
 body {
     margin: 0;
     height: 100vh;
@@ -23,4 +27,15 @@ body {
     padding: 4rem;
     background-color: var(--sub-primary-color);
     color: var(--accent-color);
+}
+
+a {
+    text-decoration: none;
+    color: var(--accent-color);
+    font-weight: bold;
+    transition: all 0.1s ease;
+}
+
+a:hover {
+    color: var(--secondary-color);
 }
