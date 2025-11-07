@@ -60,7 +60,7 @@
             'deleteinputs': 'Delete equations by index',
             'clearinputs': 'Clear all equations',
             'solve': 'Solve the system of equations',
-            'flag': 'Set solver flags (complex, integer, positive)',
+            'flag': 'Set solver flags (complex, integer, positive, pi, fraction)',
             'showflags': 'Show current flags'
         };
 
@@ -357,7 +357,9 @@
                     addLine('  flag <name> <on|off>  - Set solver flags');
                     addLine('  showflags             - Show current flags');
                     addLine('&nbsp;');
-                    addLine('<span class="dim">Available flags: complex, integer, positive</span>');
+                    addLine('<span class="dim">Available flags: complex, integer, positive, pi, fraction</span>');
+                    addLine('<span class="dim">  pi - Display solutions as multiples of π (e.g., π/2)</span>');
+                    addLine('<span class="dim">  fraction - Display solutions as fractions (e.g., 1/3)</span>');
                     addLine('<span class="dim">Supports: Linear, polynomial, trigonometric (sin, cos, tan)</span>');
                     addLine('<span class="dim">Functions: sqrt, exp, ln, log, abs, pi, e</span>');
                     addLine('<span class="dim">Examples:</span>');
@@ -505,7 +507,7 @@
                 case 'flag':
                     if (parts.length < 3) {
                         addLine('<span class="error">Usage: flag <name> <on|off></span>');
-                        addLine('<span class="dim">Available flags: complex, integer, positive</span>');
+                        addLine('<span class="dim">Available flags: complex, integer, positive, pi, fraction</span>');
                         addLine('&nbsp;');
                         break;
                     }
@@ -518,7 +520,7 @@
                         addLine('&nbsp;');
                     } else {
                         addLine(`<span class="error">Unknown flag: ${flagName}</span>`);
-                        addLine('<span class="dim">Available flags: complex, integer, positive</span>');
+                        addLine('<span class="dim">Available flags: complex, integer, positive, pi, fraction</span>');
                         addLine('&nbsp;');
                     }
                     break;
