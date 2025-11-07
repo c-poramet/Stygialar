@@ -1,6 +1,8 @@
 // Equation Solver Module
 const EqSolver = {
     equations: [],
+    equationStrings: [], // Store original equation strings
+    isLinear: true,
     flags: {
         complex: false,
         integer: false,
@@ -9,6 +11,8 @@ const EqSolver = {
 
     reset() {
         this.equations = [];
+        this.equationStrings = [];
+        this.isLinear = true;
         this.flags = {
             complex: false,
             integer: false,
@@ -99,23 +103,41 @@ const EqSolver = {
     },
 
     addEquation(eqStr) {
-        const parsed = this.parseEquation(eqStr);
-        this.equations.push(parsed);
+        // Store original equation string
+        this.equationStrings.push(eqStr);
+        
+        // Check if equation contains non-linear elements
+        const nonlinearPatterns = [
+            /\b(sin|cos|tan|exp|ln|log|sqrt|abs)\s*\(/i,  // Trig/math functions
+            /\^/,                                           // Power operator
+            /\*\s*[a-z]/i,                                 // Multiplication with variable
+            /[a-z]\s*\*/i,                                 // Variable multiplication
+            /[a-z]\s*[a-z]/i                              // Adjacent variables (like xy)
+        ];
+        
+        const isNonlinear = nonlinearPatterns.some(pattern => pattern.test(eqStr));
+        
+        if (isNonlinear) {
+            // Non-linear equation
+            this.isLinear = false;
+            this.equations.push({ type: 'nonlinear', expression: eqStr });
+        } else {
+            // Try to parse as linear equation
+            try {
+                const parsed = this.parseEquation(eqStr);
+                this.equations.push(parsed);
+            } catch (e) {
+                // Failed to parse as linear, treat as non-linear
+                this.isLinear = false;
+                this.equations.push({ type: 'nonlinear', expression: eqStr });
+            }
+        }
+        
         return this.equations.length - 1;
     },
 
     showEquations() {
-        return this.equations.map((eq, idx) => {
-            const terms = Object.entries(eq.terms)
-                .map(([v, c]) => {
-                    if (c === 0) return '';
-                    const coefStr = c === 1 ? '' : (c === -1 ? '-' : c);
-                    return `${c > 0 && idx > 0 ? '+' : ''}${coefStr}${v}`;
-                })
-                .filter(t => t)
-                .join(' ');
-            return `[${idx}] ${terms} = ${eq.constant}`;
-        });
+        return this.equationStrings.map((eq, idx) => `[${idx}] ${eq}`);
     },
 
     deleteEquations(indices) {
@@ -124,8 +146,12 @@ const EqSolver = {
         for (const idx of sorted) {
             if (idx >= 0 && idx < this.equations.length) {
                 this.equations.splice(idx, 1);
+                this.equationStrings.splice(idx, 1);
             }
         }
+        
+        // Re-check if still linear
+        this.isLinear = this.equations.every(eq => eq.type !== 'nonlinear');
     },
 
     getAllVariables() {
@@ -202,6 +228,15 @@ const EqSolver = {
             return { status: 'error', message: 'No equations to solve' };
         }
 
+        // Check if all equations are linear
+        if (this.isLinear && this.equations.every(eq => eq.type !== 'nonlinear')) {
+            return this.solveLinear();
+        } else {
+            return this.solveNonlinear();
+        }
+    },
+
+    solveLinear() {
         const { matrix, variables } = this.buildAugmentedMatrix();
         const rref = this.gaussianElimination(matrix);
         
@@ -306,5 +341,240 @@ const EqSolver = {
             return true;
         }
         return false;
+    },
+
+    // Nonlinear equation solver using Newton-Raphson method
+    solveNonlinear() {
+        try {
+            // Extract all variables from equations
+            const variables = this.extractVariables();
+            
+            if (variables.length === 0) {
+                return { status: 'error', message: 'No variables found in equations' };
+            }
+
+            // For single equation, use Newton-Raphson
+            if (this.equationStrings.length === 1 && variables.length === 1) {
+                return this.solveNewtonRaphson(this.equationStrings[0], variables[0]);
+            }
+
+            // For multiple equations/variables, use multidimensional Newton
+            return this.solveNewtonMulti(variables);
+        } catch (error) {
+            return { status: 'error', message: error.message };
+        }
+    },
+
+    extractVariables() {
+        const varSet = new Set();
+        const varRegex = /\b([a-z])\b/gi;
+        
+        for (const eqStr of this.equationStrings) {
+            const matches = eqStr.matchAll(varRegex);
+            for (const match of matches) {
+                const v = match[1].toLowerCase();
+                // Exclude function names
+                if (!['sin', 'cos', 'tan', 'log', 'ln', 'exp', 'abs', 'sqrt', 'e', 'pi'].includes(v)) {
+                    varSet.add(v);
+                }
+            }
+        }
+        
+        return Array.from(varSet).sort();
+    },
+
+    // Evaluate expression using Function constructor (safe for math expressions)
+    evaluateExpression(expr, varValues) {
+        try {
+            // Replace variables with values
+            let evalExpr = expr;
+            for (const [varName, value] of Object.entries(varValues)) {
+                // Use word boundaries to avoid replacing parts of function names
+                const regex = new RegExp(`\\b${varName}\\b`, 'g');
+                evalExpr = evalExpr.replace(regex, `(${value})`);
+            }
+
+            // Replace math functions with Math. equivalents
+            evalExpr = evalExpr
+                .replace(/\bsin\(/g, 'Math.sin(')
+                .replace(/\bcos\(/g, 'Math.cos(')
+                .replace(/\btan\(/g, 'Math.tan(')
+                .replace(/\blog\(/g, 'Math.log10(')
+                .replace(/\bln\(/g, 'Math.log(')
+                .replace(/\bexp\(/g, 'Math.exp(')
+                .replace(/\babs\(/g, 'Math.abs(')
+                .replace(/\bsqrt\(/g, 'Math.sqrt(')
+                .replace(/\bpi\b/g, 'Math.PI')
+                .replace(/\be\b/g, 'Math.E')
+                .replace(/\^/g, '**'); // Power operator
+
+            // Evaluate
+            return Function(`"use strict"; return (${evalExpr})`)();
+        } catch (e) {
+            throw new Error(`Failed to evaluate expression: ${e.message}`);
+        }
+    },
+
+    // Numerical derivative using central difference
+    derivative(expr, varName, varValues, h = 1e-6) {
+        const values1 = { ...varValues, [varName]: varValues[varName] + h };
+        const values2 = { ...varValues, [varName]: varValues[varName] - h };
+        
+        const f1 = this.evaluateExpression(expr, values1);
+        const f2 = this.evaluateExpression(expr, values2);
+        
+        return (f1 - f2) / (2 * h);
+    },
+
+    // Single variable Newton-Raphson
+    solveNewtonRaphson(equation, varName, maxIterations = 100, tolerance = 1e-6) {
+        // Split equation into LHS and RHS
+        const sides = equation.split('=');
+        if (sides.length !== 2) {
+            return { status: 'error', message: 'Invalid equation format' };
+        }
+
+        // Create f(x) = LHS - RHS
+        const f = `(${sides[0].trim()}) - (${sides[1].trim()})`;
+
+        // Initial guess
+        let x = 0;
+        let iterations = 0;
+
+        while (iterations < maxIterations) {
+            const varValues = { [varName]: x };
+            
+            // Evaluate f(x)
+            const fx = this.evaluateExpression(f, varValues);
+            
+            if (Math.abs(fx) < tolerance) {
+                // Found solution
+                const result = this.applyConstraints(x);
+                if (result === null) {
+                    return { status: 'error', message: 'Solution violates constraints' };
+                }
+                return {
+                    status: 'unique',
+                    solution: { [varName]: result },
+                    iterations,
+                    method: 'Newton-Raphson'
+                };
+            }
+
+            // Evaluate f'(x)
+            const fpx = this.derivative(f, varName, varValues);
+            
+            if (Math.abs(fpx) < 1e-12) {
+                // Derivative too small, try different starting point
+                x = Math.random() * 10 - 5;
+                iterations++;
+                continue;
+            }
+
+            // Newton update: x = x - f(x)/f'(x)
+            x = x - fx / fpx;
+            iterations++;
+        }
+
+        return {
+            status: 'error',
+            message: `No convergence after ${maxIterations} iterations. Try different initial conditions.`
+        };
+    },
+
+    // Multi-variable Newton method
+    solveNewtonMulti(variables, maxIterations = 100, tolerance = 1e-6) {
+        const n = variables.length;
+        const m = this.equationStrings.length;
+
+        if (n !== m) {
+            return {
+                status: 'error',
+                message: `System is ${n > m ? 'underdetermined' : 'overdetermined'} (${n} variables, ${m} equations)`
+            };
+        }
+
+        // Initial guess (all zeros)
+        const x = variables.reduce((obj, v) => ({ ...obj, [v]: 0 }), {});
+        
+        for (let iter = 0; iter < maxIterations; iter++) {
+            // Build Jacobian matrix and function vector
+            const J = [];
+            const F = [];
+
+            for (let i = 0; i < m; i++) {
+                const eq = this.equationStrings[i];
+                const sides = eq.split('=');
+                const f = `(${sides[0].trim()}) - (${sides[1].trim()})`;
+
+                // Evaluate f_i(x)
+                const fi = this.evaluateExpression(f, x);
+                F.push(fi);
+
+                // Compute Jacobian row (derivatives with respect to each variable)
+                const jRow = [];
+                for (const v of variables) {
+                    const deriv = this.derivative(f, v, x);
+                    jRow.push(deriv);
+                }
+                J.push(jRow);
+            }
+
+            // Check convergence
+            const norm = Math.sqrt(F.reduce((sum, fi) => sum + fi * fi, 0));
+            if (norm < tolerance) {
+                // Apply constraints
+                const solution = {};
+                for (const v of variables) {
+                    const val = this.applyConstraints(x[v]);
+                    if (val === null) {
+                        return { status: 'error', message: `Solution for ${v} violates constraints` };
+                    }
+                    solution[v] = val;
+                }
+                
+                return {
+                    status: 'unique',
+                    solution,
+                    iterations: iter,
+                    method: 'Multidimensional Newton'
+                };
+            }
+
+            // Solve J * delta = -F using Gaussian elimination
+            const augmented = J.map((row, i) => [...row, -F[i]]);
+            const delta = this.solveLinearSystem(augmented);
+
+            if (delta === null) {
+                return { status: 'error', message: 'Jacobian is singular, cannot continue' };
+            }
+
+            // Update x = x + delta
+            for (let i = 0; i < n; i++) {
+                x[variables[i]] += delta[i];
+            }
+        }
+
+        return {
+            status: 'error',
+            message: `No convergence after ${maxIterations} iterations`
+        };
+    },
+
+    // Solve linear system Ax = b (A is augmented matrix)
+    solveLinearSystem(augmented) {
+        const n = augmented.length;
+        const rref = this.gaussianElimination(augmented);
+        
+        // Back substitution
+        const x = new Array(n);
+        for (let i = n - 1; i >= 0; i--) {
+            if (Math.abs(rref[i][i]) < 1e-10) {
+                return null; // Singular matrix
+            }
+            x[i] = rref[i][n];
+        }
+        
+        return x;
     }
 };

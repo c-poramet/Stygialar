@@ -358,7 +358,12 @@
                     addLine('  showflags             - Show current flags');
                     addLine('&nbsp;');
                     addLine('<span class="dim">Available flags: complex, integer, positive</span>');
-                    addLine('<span class="dim">Example: input 2x - 3y = 6, 3x + y = 8</span>');
+                    addLine('<span class="dim">Supports: Linear, polynomial, trigonometric (sin, cos, tan)</span>');
+                    addLine('<span class="dim">Functions: sqrt, exp, ln, log, abs, pi, e</span>');
+                    addLine('<span class="dim">Examples:</span>');
+                    addLine('<span class="dim">  Linear: input 2x - 3y = 6, 3x + y = 8</span>');
+                    addLine('<span class="dim">  Nonlinear: input x^2 + y^2 = 25, x - y = 1</span>');
+                    addLine('<span class="dim">  Trig: input sin(x) = 0.5</span>');
                     addLine('&nbsp;');
                     break;
 
@@ -449,6 +454,13 @@
                             addLine('<span class="accent">║  UNIQUE SOLUTION FOUND                ║</span>');
                             addLine('<span class="accent">╚═══════════════════════════════════════╝</span>');
                             addLine('&nbsp;');
+                            if (result.method) {
+                                addLine(`<span class="dim">Method: ${result.method}</span>`);
+                                if (result.iterations !== undefined) {
+                                    addLine(`<span class="dim">Iterations: ${result.iterations}</span>`);
+                                }
+                                addLine('&nbsp;');
+                            }
                             for (const [v, val] of Object.entries(result.solution)) {
                                 if (val === null) {
                                     addLine(`<span class="warning">  ${v} = No valid solution (constraint violation)</span>`);
