@@ -56,35 +56,38 @@ const EqSolver = {
         // Parse an expression and return terms with their coefficients
         const terms = { constant: 0 };
         
-        // Match both variable terms and constant terms
-        const termRegex = /([+-]?\s*\d*\.?\d*)\s*([a-z])?/gi;
-        let match;
+        // Remove all spaces first
+        expr = expr.replace(/\s+/g, '');
+        
+        // Split into tokens: numbers, variables, operators
+        // Match patterns like: +3x, -2y, +5, -10, x, y
+        const pattern = /([+-])?(\d*\.?\d+)?([a-z])?/gi;
+        const matches = expr.matchAll(pattern);
+        
         let hasContent = false;
-
-        while ((match = termRegex.exec(expr)) !== null) {
-            const fullMatch = match[0].trim();
-            if (!fullMatch || fullMatch === '+' || fullMatch === '-') continue;
-
-            let coef = match[1].replace(/\s/g, '');
-            const variable = match[2] ? match[2].toLowerCase() : null;
-
+        
+        for (const match of matches) {
+            const fullMatch = match[0];
+            if (!fullMatch) continue;
+            
+            const sign = match[1] || '+';
+            const number = match[2];
+            const variable = match[3] ? match[3].toLowerCase() : null;
+            
             if (variable) {
-                // Variable term
-                if (coef === '' || coef === '+') coef = '1';
-                else if (coef === '-') coef = '-1';
+                // Variable term like "3x" or "x"
+                let coef = number ? parseFloat(number) : 1;
+                if (sign === '-') coef = -coef;
                 
-                const coefNum = parseFloat(coef);
-                if (isNaN(coefNum)) continue;
-                
-                terms[variable] = (terms[variable] || 0) + coefNum;
+                terms[variable] = (terms[variable] || 0) + coef;
                 hasContent = true;
-            } else {
-                // Constant term (number only)
-                const coefNum = parseFloat(coef);
-                if (!isNaN(coefNum)) {
-                    terms.constant += coefNum;
-                    hasContent = true;
-                }
+            } else if (number) {
+                // Constant term like "5" or "-10"
+                let value = parseFloat(number);
+                if (sign === '-') value = -value;
+                
+                terms.constant += value;
+                hasContent = true;
             }
         }
 
